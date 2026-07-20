@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>DispatchCenter.Base</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Shared domain linked from the root project — identical code, no copy -->
+    <Compile Include="..\DispatchCenter.cs" Link="Domain\DispatchCenter.cs" />
+    <Compile Include="..\Unit.cs" Link="Domain\Unit.cs" />
+    <Compile Include="..\Incident.cs" Link="Domain\Incident.cs" />
+    <Compile Include="..\enums.cs" Link="Domain\enums.cs" />
+    <Compile Include="..\EventArg.cs" Link="Domain\EventArg.cs" />
+  </ItemGroup>
+
+</Project>

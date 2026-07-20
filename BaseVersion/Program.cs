@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// BASE VERSION (pre-AI) — reference only, excluded from compilation.
+// BASE VERSION (pre-AI) — runnable via: dotnet run --project BaseVersion
 //
 // This is the dispatch center as a plain menu-driven console app: every action
 // is a numbered menu choice and a sequence of typed prompts. No Agent
@@ -11,8 +11,8 @@
 // IDENTICAL between the two versions — only the interaction layer changes.
 // That is the point of the comparison.
 //
-// Excluded from build via <Compile Remove="BaseVersion\**" /> in the csproj
-// (two Program classes with Main cannot coexist in one executable).
+// This is a standalone project (BaseVersion.csproj) linking the shared domain
+// files; the root project excludes this folder so the two Mains never collide.
 // ═══════════════════════════════════════════════════════════════════════════
 
 internal class Program
