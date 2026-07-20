@@ -1,4 +1,7 @@
 <Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Domain/Domain.csproj" />
+  </Folder>
   <Project Path="BaseVersion/BaseVersion.csproj" />
   <Project Path="UsingAIFramework.csproj" />
 </Solution>

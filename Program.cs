@@ -1,8 +1,8 @@
 ﻿using Azure;
-using Azure.AI.Projects;
-using Azure.Identity;
+using Azure.AI.OpenAI;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
+using OpenAI.Chat;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -16,7 +16,7 @@ internal class Program
 
     [Description("Report a new incident to the dispatch center.")]
     static string ReportIncident(
-        [Description("Type of incident: MedicalEmergency, Fire, CrimeInProgress, TrafficAccident, HazardousMaterial")] string type,
+        [Description("Type of incident: MedicalEmergency, Fire, CrimeInProgress, TrafficIncident, HazardousMaterial")] string type,
         [Description("Priority level: Low, Medium, High, Critical")] string priority,
         [Description("Location of the incident")] string location,
         [Description("Description of the incident")] string description)
@@ -84,20 +84,31 @@ internal class Program
         main.AddUnit(new Unit("FFR111", "Lincroft", UnitType.Firefighter));
         main.AddUnit(new Unit("FFR222", "Oceanport", UnitType.Firefighter));
 
-        AIAgent agent = new AIProjectClient(
+        // Key-based Azure OpenAI auth (DefaultAzureCredential fails in our environment).
+        // Set AZURE_OPENAI_API_KEY in your environment before running.
+        string apiKey = Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY")
+            ?? throw new InvalidOperationException("Set the AZURE_OPENAI_API_KEY environment variable.");
+
+        AIAgent agent = new AzureOpenAIClient(
             new Uri("https://squidopenai.openai.azure.com/"),
-            new DefaultAzureCredential())
-            .AsAIAgent(
-                model: "gpt-4o-mini",
-                instructions: "You are a city dispatch center assistant. Use GetStatus first to find current unit and incident IDs before dispatching or resolving. Always use exact IDs.",
-                tools:
-                [
-                    AIFunctionFactory.Create(GetStatus),
-                    new ApprovalRequiredAIFunction(AIFunctionFactory.Create(ReportIncident)),
-                    new ApprovalRequiredAIFunction(AIFunctionFactory.Create(DispatchUnit)),
-                    new ApprovalRequiredAIFunction(AIFunctionFactory.Create(MarkArrived)),
-                    new ApprovalRequiredAIFunction(AIFunctionFactory.Create(ResolveIncident)),
-                ]);
+            new AzureKeyCredential(apiKey))
+            .GetChatClient("gpt-4o-mini")
+            .AsAIAgent(new ChatClientAgentOptions
+            {
+                Name = "DispatchAgent",
+                ChatOptions = new()
+                {
+                    Instructions = "You are a city dispatch center assistant. Use GetStatus first to find current unit and incident IDs before dispatching or resolving. Always use exact IDs.",
+                    Tools =
+                    [
+                        AIFunctionFactory.Create(GetStatus),
+                        new ApprovalRequiredAIFunction(AIFunctionFactory.Create(ReportIncident)),
+                        new ApprovalRequiredAIFunction(AIFunctionFactory.Create(DispatchUnit)),
+                        new ApprovalRequiredAIFunction(AIFunctionFactory.Create(MarkArrived)),
+                        new ApprovalRequiredAIFunction(AIFunctionFactory.Create(ResolveIncident)),
+                    ]
+                }
+            });
 
         AgentSession session = await agent.CreateSessionAsync();
 
@@ -123,7 +134,7 @@ internal class Program
 
             while (approvalRequests.Count > 0)
             {
-                List<ChatMessage> approvalResponses = approvalRequests.ConvertAll(req =>
+                List<Microsoft.Extensions.AI.ChatMessage> approvalResponses = approvalRequests.ConvertAll(req =>
                 {
                     string functionName = ((FunctionCallContent)req.ToolCall).Name;
                     string arguments = ((FunctionCallContent)req.ToolCall).Arguments?.ToString() ?? "";
@@ -136,7 +147,7 @@ internal class Program
                     Console.Write("Approve? (y/n): ");
                     bool approved = Console.ReadLine()?.Trim().ToLower() == "y";
 
-                    return new ChatMessage(ChatRole.User, [req.CreateResponse(approved)]);
+                    return new Microsoft.Extensions.AI.ChatMessage(ChatRole.User, [req.CreateResponse(approved)]);
                 });
 
                 response = await agent.RunAsync(approvalResponses, session);
