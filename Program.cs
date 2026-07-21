@@ -87,7 +87,7 @@ internal class Program
         // Key-based Azure OpenAI auth (DefaultAzureCredential fails in our environment).
         // Set AZURE_OPENAI_API_KEY in your environment before running.
         string apiKey = Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY")
-            ?? throw new InvalidOperationException("Set the AZURE_OPENAI_API_KEY environment variable.");
+            ?? throw new InvalidOperationException("Set AZURE_OPENAI_API_KEY before running.");
 
         AIAgent agent = new AzureOpenAIClient(
             new Uri("https://squidopenai.openai.azure.com/"),
