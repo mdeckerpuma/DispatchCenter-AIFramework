@@ -8,15 +8,27 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- BaseVersion holds the pre-AI Program.cs for comparison; two Mains can't coexist -->
+    <!-- BaseVersion holds the pre-AI Program.cs for comparison; two Mains can't coexist.
+         src/ holds sub-projects (Domain), labs/ holds the codealong labs — all excluded
+         from the root app's default compile glob. -->
     <Compile Remove="BaseVersion\**" />
+    <Compile Remove="src\**" />
+    <Compile Remove="labs\**" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="src\Domain\Domain.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Anthropic" Version="12.36.0" />
+    <PackageReference Include="Azure.AI.OpenAI" Version="2.1.0" />
     <PackageReference Include="Azure.AI.Projects" Version="2.0.1" />
     <PackageReference Include="Azure.Identity" Version="1.21.0" />
     <PackageReference Include="Microsoft.Agents.AI.Foundry" Version="1.5.0" />
+    <PackageReference Include="Microsoft.Agents.AI.OpenAI" Version="1.13.0" />
     <PackageReference Include="Microsoft.Extensions.AI" Version="10.8.0" />
+    <PackageReference Include="OllamaSharp" Version="5.4.27" />
   </ItemGroup>
 
 </Project>

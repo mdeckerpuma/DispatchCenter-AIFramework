@@ -9,12 +9,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Shared domain linked from the root project — identical code, no copy -->
-    <Compile Include="..\DispatchCenter.cs" Link="Domain\DispatchCenter.cs" />
-    <Compile Include="..\Unit.cs" Link="Domain\Unit.cs" />
-    <Compile Include="..\Incident.cs" Link="Domain\Incident.cs" />
-    <Compile Include="..\enums.cs" Link="Domain\enums.cs" />
-    <Compile Include="..\EventArg.cs" Link="Domain\EventArg.cs" />
+    <!-- Shared domain — same project the AI version uses -->
+    <ProjectReference Include="..\src\Domain\Domain.csproj" />
   </ItemGroup>
 
 </Project>

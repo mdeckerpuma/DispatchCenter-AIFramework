@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 
 
-class DispatchCenter
+public class DispatchCenter
 {
     private List<Unit> _units { get; } = new();
     private List<Incident> _incidents { get; } = new();
