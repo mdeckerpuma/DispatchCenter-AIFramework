@@ -9,3 +9,6 @@
 
 # Rider
 .idea/
+
+# Local config (secrets)
+appsettings.json

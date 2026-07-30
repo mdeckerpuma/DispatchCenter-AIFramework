@@ -1,17 +1,19 @@
-﻿using System;
+﻿using Domain;
+using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
+using System.Text;
 
 
-public class DispatchCenter
+public class DispatchService
 {
     private List<Unit> _units { get; } = new();
     private List<Incident> _incidents { get; } = new();
+    private readonly IDispatchSink _sink; 
     private int _counter = 1000;
 
-    public event EventHandler<IncidentEventArgs>? IncidentReported;
-    public event EventHandler<DispatchEventArgs>? UnitDispatched;
-    public event EventHandler<string>? AlertBroadcast;
+    public DispatchService(IDispatchSink sink) { _sink = sink; }
 
     public void AddUnit(Unit unit)
     {
@@ -29,17 +31,10 @@ public class DispatchCenter
 
         _incidents.Add(incident);
 
-        IncidentReported?.Invoke(this, new IncidentEventArgs(incident));
-
-        if(priority == IncidentPriority.Critical)
-        {
-            AlertBroadcast?.Invoke(this, $"{incident.Location} is critical");
-        }
-
         return incident;
     }
 
-    public bool DisbatchUnit(string unitId, string incidentId)
+    public bool DispatchUnit(string unitId, string incidentId)
     {
         Unit foundUnit = _units.FirstOrDefault(unit => unit.Id == unitId);
         Incident foundIncident = _incidents.FirstOrDefault(incident => incident.Id == incidentId);
@@ -50,7 +45,10 @@ public class DispatchCenter
         foundUnit.Dispatch(foundIncident.Id);
         foundIncident.AssignUnit(foundUnit.Id);
 
-        UnitDispatched?.Invoke(this, new DispatchEventArgs(foundIncident, foundUnit));
+        DispatchOrder tosink = new DispatchOrder(unitId, foundUnit.Name, foundUnit.Type, incidentId, foundIncident.Type, foundIncident.Priority,
+            foundIncident.Location, DateTime.Now);
+
+        _sink.send(tosink);
 
         return true;
     }
@@ -61,12 +59,12 @@ public class DispatchCenter
         Unit foundUnit = _units.FirstOrDefault(unit => unit.Status == UnitStatus.Dispatched && unit.Id == unitId);
         if (foundUnit == null) { return false; }
 
-        foundUnit.ArriveOnScene();
-
         string incidentId = foundUnit.AssignIncidentId;
         Incident foundIncident = _incidents.FirstOrDefault(incident => incident.Id == incidentId);
         if (foundIncident == null) { return false; }
+
         foundIncident.MarkOnScene();
+        foundUnit.ArriveOnScene();
 
         return true;
     }
@@ -110,4 +108,30 @@ public class DispatchCenter
         return unresolved;
     }
 
+    public string GetStatus()
+    {
+        StringBuilder sb = new StringBuilder();
+        sb.AppendLine("ACTIVE INCIDENTS");
+        foreach(Incident active in GetActiveIncidents())
+        {
+            sb.AppendLine($"{active.Id} in {active.Location} IS ACTIVE");
+        }
+        sb.AppendLine("\nUNITS");
+        foreach(Unit unit in GetUnits())
+        {
+            sb.AppendLine($"{unit.Type} [{unit.Id}] status is {unit.Status}");
+        }
+
+        return sb.ToString();
+    }
+
+    public void LoadIncident(Incident i)
+    {
+        _incidents.Add(i);
+    }
+
+    public void SetNextId(int id)
+    {
+        _counter = id;
+    }
  }

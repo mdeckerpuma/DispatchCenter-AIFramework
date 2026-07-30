@@ -15,21 +15,19 @@
 // files; the root project excludes this folder so the two Mains never collide.
 // ═══════════════════════════════════════════════════════════════════════════
 
+using Domain;
+
 internal class Program
 
     {
-
-    static DispatchCenter main = new DispatchCenter();
+    ConsoleDispatchSink sink = new ConsoleDispatchSink();
+    static DispatchService main = new DispatchService(sink);
 
     static void Main(string[] args)
 
         {
 
-        main.IncidentReported += (_, e) => Console.WriteLine($"\n[INCIDENT] {e.Incident.Id} at {e.Incident.Location}");
-
-        main.UnitDispatched += (_, e) => Console.WriteLine($"\n[DISPATCH] {e.Unit.Id} dispatched to {e.Incident.Location}");
-
-        main.AlertBroadcast += (_, msg) => Console.WriteLine($"\n[ALERT] {msg}");
+        
 
         Unit police1 = new Unit("POL111", "Ride Combat", UnitType.Police);
 
