@@ -1,26 +1,39 @@
 ﻿using Domain;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Configuration.Json;
 using System;
 using System.Collections.Generic;
 using UsingAIFramework.AI;
-using Microsoft.Extensions.Configuration.Json;
+using OpenTelemetry;
+using OpenTelemetry.Trace;
+using Azure.Monitor.OpenTelemetry.Exporter;
 
 internal class Program
 {
     static async Task Main(string[] args)
     {
+        using var tracerProvider = Sdk.CreateTracerProviderBuilder()
+           .AddSource("DispatchDemo")
+           .AddAzureMonitorTraceExporter()
+           .Build();
+
         IConfiguration config = new ConfigurationBuilder()
             .AddJsonFile("appsettings.json")
             .Build();
 
+        bool debug = args.Contains("--verbose");
+
         string connectionString = config["MongoDB:ConnectionString"]!;
         string dbName = config["MongoDB:DatabaseName"]!;
+        string agentDeployment = config["AzureOpenAI:AgentDeployment"]!;
+        IChatClient chatClient = ChatClientFactory.Create(config, agentDeployment);
 
         ConsoleDispatchSink sink = new ConsoleDispatchSink();
         DispatchService main = new DispatchService(sink);
         IncidentRepository repo = new IncidentRepository(connectionString, dbName);
         SummaryRepository summaryrepo = new SummaryRepository(connectionString, dbName);
-        SummaryAgent sum = new SummaryAgent(repo,summaryrepo);
+        SummaryAgent sum = new SummaryAgent(repo,summaryrepo,chatClient);
 
 
         Unit police1 = new Unit("POL001", "Eagle One", UnitType.Police);
@@ -98,7 +111,7 @@ internal class Program
         main.AddUnit(firefighter16); main.AddUnit(firefighter17);
 
 
-        await new DispatchAgent(main,repo,sum).RunAsync();
+        await new DispatchAgent(main,repo,sum,chatClient,debug).RunAsync();
     }
 }
 

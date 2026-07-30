@@ -28,27 +28,53 @@ namespace UsingAIFramework.AI
         private readonly IIncidentRepository _repository;
         private readonly SummaryAgent _summaryagent;
         private readonly AIAgent _agent;
+        private readonly bool _debug;
+        private readonly IChatClient _chatClient;
 
 
-        public DispatchAgent(DispatchService service, IIncidentRepository repository, SummaryAgent summaryagent) 
+        public DispatchAgent(DispatchService service, IIncidentRepository repository, SummaryAgent summaryagent, IChatClient chatClient,bool debug = false) 
         {
             _service = service;
             _repository = repository;
             _summaryagent = summaryagent;
+            _debug = debug;
+            _chatClient = chatClient;
 
-            string apiKey = Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY")
-                ?? throw new InvalidOperationException("Set AZURE_OPENAI_API_KEY");
-
-            var endpoint = "https://squidopenai.openai.azure.com/";
-            var deploymentName = "gpt-4o-mini";
-
-            _agent = new AzureOpenAIClient(new Uri(endpoint), new AzureKeyCredential(apiKey)).GetChatClient(deploymentName).AsIChatClient()
+            _agent = _chatClient
                 .AsAIAgent(new ChatClientAgentOptions
                 {
                     Name = "Dispatch Agent",
                     ChatOptions = new()
                     {
-                        Instructions = "You are a city dispatch center AI assistant. You manage incidents and dispatch units on behalf of a human dispatcher who confirms every action.\\n\\nCONVERSATION RULES:\\n- Listen carefully and extract all information from what the user says before asking for anything.\\n- Only ask for information that is genuinely missing. Never ask for something already stated.\\n- Infer priority from context when obvious: any life-threatening situation, large fire, bomb, or mass casualty is Critical. Minor property damage or non-urgent situations are Low or Medium.\\n- Handle one incident completely (report + dispatch) before starting the next.\\n- Never make assumptions about unit IDs, incident IDs, or locations. These must come from the user or GetStatus.\\n\\nTOOL CALL RULES:\\n- Never call ReportIncident unless you have: type, priority, location, and description. All four must be present.\\n- Never call DispatchUnit or ResolveIncident without calling GetStatus first to confirm exact IDs.\\n- Never call GetStatus for any other reason. Do not call it before ReportIncident.\\n- GetStatus never requires approval. Call it silently and use the result immediately.\\n- Once a tool call is approved and executes successfully, never call it again for the same incident.\\n- If a tool call is denied, stop immediately. Ask the user exactly what was wrong before doing anything else. Do not retry until the user has explained the problem and you have adjusted.\\n- Never call multiple tools speculatively. Only call a tool when you are certain all arguments are correct.\\n\\nAFTER DENIAL:\\n- Do not retry the same call with the same arguments.\\n- Do not call GetStatus defensively.\\n- Do not ask for information already provided.\\n- Ask one specific question: what was wrong with the previous attempt.\\n\\nPRIORITY INFERENCE GUIDE:\\n- Critical: life threat, mass casualties, large fire, bomb, weapon, serious injury\\n- High: significant property damage, escalating situation, multiple people at risk\\n- Medium: contained situation, minor injuries, non-escalating\\n- Low: minor incident, no immediate danger\r\n",
+                        Instructions = @"You are a city dispatch center AI assistant. You manage incidents and dispatch units on behalf of a human dispatcher who confirms every action.
+
+CONVERSATION RULES:
+- Listen carefully and extract all information from what the user says before asking for anything.
+- Only ask for information that is genuinely missing. Never ask for something already stated.
+- Infer priority from context when obvious: any life-threatening situation, large fire, bomb, or mass casualty is Critical. Minor property damage or non-urgent situations are Low or Medium.
+- Handle one incident completely (report + dispatch) before starting the next.
+- Never make assumptions about unit IDs, incident IDs, or locations. These must come from the user or GetStatus.
+
+TOOL CALL RULES:
+- Never call ReportIncident unless you have: type, priority, location, and description. All four must be present.
+- Never call DispatchUnit or ResolveIncident without calling GetStatus first to confirm exact IDs.
+- Never call GetStatus for any other reason. Do not call it before ReportIncident.
+- GetStatus never requires approval. Call it silently and use the result immediately.
+- Once a tool call is approved and executes successfully, never call it again for the same incident.
+- If a tool call is denied, stop immediately. Ask the user exactly what was wrong before doing anything else. Do not retry until the user has explained the problem and you have adjusted.
+- Never call multiple tools speculatively. Only call a tool when you are certain all arguments are correct.
+
+AFTER DENIAL:
+- Do not retry the same call with the same arguments.
+- Do not call GetStatus defensively.
+- Do not ask for information already provided.
+- Ask one specific question: what was wrong with the previous attempt.
+
+PRIORITY INFERENCE GUIDE:
+- Critical: life threat, mass casualties, large fire, bomb, weapon, serious injury
+- High: significant property damage, escalating situation, multiple people at risk
+- Medium: contained situation, minor injuries, non-escalating
+- Low: minor incident, no immediate danger",
                         Tools =
                         [
                             AIFunctionFactory.Create(GetStatus),
@@ -59,10 +85,55 @@ namespace UsingAIFramework.AI
                             new ApprovalRequiredAIFunction(AIFunctionFactory.Create(ResolveIncident)),
                         ]
                     }
-                });
+                }).AsBuilder()
+                  .Use(LoggingMiddleware)
+                  .Use(FunctionGateMiddleware)
+                  .Build(); ;
 
             
         }
+
+        //MIDDLEWARE
+
+        // Run middleware — wraps the entire agent turn, firing once per user message.
+        // Everything before `await next(...)` runs before the model sees the message.
+        // Everything after runs once the model has finished and all tool calls are complete.
+        // This is the right layer for turn-level concerns: timing a full response, logging
+        // the incoming messages, enforcing a token budget, or rejecting a turn entirely
+        // before the model ever gets to think.
+        private static async Task LoggingMiddleware(
+            IEnumerable<ChatMessage> messages,
+            AgentSession? session,
+            AgentRunOptions? options,
+            Func<IEnumerable<ChatMessage>, AgentSession?, AgentRunOptions?, CancellationToken, Task> next,
+            CancellationToken ct)
+        {
+            Console.WriteLine("[TURN START]");
+            await next(messages, session, options, ct);
+            Console.WriteLine("[TURN END]");
+        }
+
+        // Function-calling middleware — wraps each individual tool call the model emits.
+        // Fires only when the model decides to call a tool, not on plain text responses.
+        // Everything before `await next(ctx, ct)` runs before the function executes.
+        // Everything after runs once the function has returned its result.
+        // This is the right layer for tool-level concerns: logging which tools are called
+        // and how long they take, building an allow-list that blocks unauthorized tools,
+        // validating arguments before they reach the function, or overriding the result
+        // the model receives back. ctx.Function.Name identifies which tool is being called.
+        private static async ValueTask<object?> FunctionGateMiddleware(
+            AIAgent agent,
+            FunctionInvocationContext ctx,
+            Func<FunctionInvocationContext, CancellationToken, ValueTask<object?>> next,
+            CancellationToken ct)
+        {
+            Console.WriteLine($"[TOOL] Calling: {ctx.Function.Name}");
+            object? result = await next(ctx, ct);
+            Console.WriteLine($"[TOOL] Completed: {ctx.Function.Name}");
+            return result;
+        }
+
+        // TOOL APPROVALS FOR THE AGENT. FUNCTIONS THAT SHOULD BE CALLED BY THE AGENT
 
         [Description("Call this method to report an incident")]
         private async Task<string> ReportIncident(
@@ -155,6 +226,45 @@ namespace UsingAIFramework.AI
         {
             return _service.GetStatus();
         }
+
+        // Manual response inspector — call explicitly after a RunAsync to dump the full
+        // message walk, token usage, and tool call/result pairs for that one response.
+        // Use this for targeted debugging. For automatic per-turn logging, see LoggingMiddleware.
+        private static void InspectResponse(AgentResponse response)
+        {
+            Console.WriteLine($"[USAGE] Input: {response.Usage?.InputTokenCount} | Output: {response.Usage?.OutputTokenCount} | Total: {response.Usage?.TotalTokenCount}");
+            
+            foreach(ChatMessage message in response.Messages)
+            {
+                Console.WriteLine($"\n[{message.Role}]");
+
+                foreach(AIContent content in message.Contents)
+                {
+                    switch (content)
+                    {
+                        case TextContent t:
+                            Console.WriteLine($"  TEXT: {t.Text}");
+                            break;
+
+                        case FunctionCallContent fc:
+                            Console.WriteLine($"  TOOL CALL: {fc.Name} | CallId: {fc.CallId}");
+                            foreach (var arg in fc.Arguments!)
+                                Console.WriteLine($"    {arg.Key}: {arg.Value}");
+                            break;
+
+                        case FunctionResultContent fr:
+                            Console.WriteLine($"  TOOL RESULT: CallId: {fr.CallId} | Result: {fr.Result}");
+                            break;
+
+                        case ToolApprovalRequestContent ta:
+                            Console.WriteLine($"  APPROVAL REQUEST: {((FunctionCallContent)ta.ToolCall).Name}");
+                            break;
+                    }
+                }
+            }
+        }
+
+        //Running the console
         public async Task RunAsync()
         {
             List<IncidentRecord> increc = await _repository.GetActiveIncidentAsync();
@@ -169,6 +279,17 @@ namespace UsingAIFramework.AI
 
                     Incident temp = new Incident(i.IncidentId, type, priority, i.Location, i.Description);
                     _service.LoadIncident(temp);
+
+                    foreach (AssignedUnitRecord u in i.AssignedUnits)
+                    {
+                        Unit? unit = _service.GetUnits().FirstOrDefault(unit => unit.Id == u.UnitId);
+                        if (unit == null) continue;
+
+                        if (u.UnitStatus == UnitStatus.Dispatched.ToString())
+                            unit.Dispatch(i.IncidentId);
+                        else if (u.UnitStatus == UnitStatus.OnScene.ToString())
+                            unit.ArriveOnScene();
+                    }
 
                     int num = int.Parse(i.IncidentId.Split("-")[1]);
                     if(num > highest)
@@ -231,7 +352,8 @@ namespace UsingAIFramework.AI
                 string? finalText = response.Messages
                     .Where(m => m.Role == ChatRole.Assistant).Last()?.Text;
                 Console.WriteLine(finalText);
-            
+                if (_debug) InspectResponse(response);
+
 
             }
         }

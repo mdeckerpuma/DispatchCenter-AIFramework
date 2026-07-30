@@ -14,19 +14,15 @@ namespace UsingAIFramework.AI
         private readonly IIncidentRepository _incidents;
         private readonly ISummaryRepository _summaries;
         private readonly AIAgent _agent;
+        private readonly IChatClient _chatClient;
 
-        public SummaryAgent(IIncidentRepository incidents, ISummaryRepository summaries) 
+        public SummaryAgent(IIncidentRepository incidents, ISummaryRepository summaries, IChatClient chatClient) 
         {
             _incidents = incidents; 
             _summaries = summaries;
+            _chatClient = chatClient;
 
-            string apiKey = Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY")
-                ?? throw new InvalidOperationException("Set AZURE_OPENAI_API_KEY");
-
-            var endpoint = "https://squidopenai.openai.azure.com/";
-            var deploymentName = "gpt-4o-mini";
-
-            AIAgent agent = new AzureOpenAIClient(new Uri(endpoint), new AzureKeyCredential(apiKey)).GetChatClient(deploymentName).AsIChatClient()
+            _agent = _chatClient
                 .AsAIAgent(new ChatClientAgentOptions
                 {
                     Name = "Summary Agent",
@@ -37,7 +33,6 @@ namespace UsingAIFramework.AI
                         []
                     }
                 });
-            _agent = agent;
         }
 
         public async Task<string> SummarizeAsync()
