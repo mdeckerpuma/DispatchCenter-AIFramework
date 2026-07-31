@@ -60,11 +60,11 @@ PRIORITY INFERENCE GUIDE:
                         Tools =
                         [
                             AIFunctionFactory.Create(GetStatus),
-                            AIFunctionFactory.Create(_summaryagent.SummarizeAsync),
                             new ApprovalRequiredAIFunction(AIFunctionFactory.Create(ReportIncident)),
                             new ApprovalRequiredAIFunction(AIFunctionFactory.Create(DispatchUnit)),
                             new ApprovalRequiredAIFunction(AIFunctionFactory.Create(MarkArrived)),
                             new ApprovalRequiredAIFunction(AIFunctionFactory.Create(ResolveIncident)),
+                            new ApprovalRequiredAIFunction(AIFunctionFactory.Create(SummarizeIncidents)),
                         ]
                     }
                 }).AsBuilder()
@@ -222,6 +222,12 @@ PRIORITY INFERENCE GUIDE:
         private string GetStatus()
         {
             return _service.GetStatus();
+        }
+
+        [Description("Call this method to generate a shift handoff briefing of all active incidents")]
+        private async Task<string> SummarizeIncidents()
+        {
+            return await _summaryagent.SummarizeAsync();
         }
 
         // Manual response inspector — call explicitly after a RunAsync to dump the full
