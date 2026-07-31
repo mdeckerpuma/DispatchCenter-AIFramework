@@ -397,9 +397,22 @@ PRIORITY INFERENCE GUIDE:
                     .ToList();
                 }
 
+                // LastOrDefault, not Last. A turn can legitimately come back with no assistant
+                // message at all — a denial that produced only tool results, for instance — and
+                // Last() throws InvalidOperationException on an empty sequence, which would end
+                // the shift on an exception instead of a reply. The ?. was already written as if
+                // this could be null; now it actually can be.
                 string? finalText = response.Messages
-                    .Where(m => m.Role == ChatRole.Assistant).Last()?.Text;
-                Console.WriteLine(finalText);
+                    .Where(m => m.Role == ChatRole.Assistant).LastOrDefault()?.Text;
+
+                if (string.IsNullOrWhiteSpace(finalText))
+                {
+                    Console.WriteLine("[no reply from the agent - rephrase or try again]");
+                }
+                else
+                {
+                    Console.WriteLine(finalText);
+                }
                 if (_debug) InspectResponse(response);
 
 

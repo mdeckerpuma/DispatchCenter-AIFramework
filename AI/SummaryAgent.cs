@@ -66,8 +66,13 @@ namespace UsingAIFramework.AI
             
             AgentResponse response = await _agent.RunAsync(incidentData);
 
-            string? summary = response.Messages
-                   .Where(m => m.Role == ChatRole.Assistant).Last().Text ?? "NoSummary Generated";
+            // LastOrDefault, not Last: Last() throws on an empty sequence, so the ?? fallback
+            // could never have been reached. This runs at startup, before the console is even
+            // drawn, so a throw here took the whole app down before the shift began.
+            string? text = response.Messages
+                   .Where(m => m.Role == ChatRole.Assistant).LastOrDefault()?.Text;
+
+            string summary = string.IsNullOrWhiteSpace(text) ? "NoSummary Generated" : text;
 
             SummaryRecord sum = new SummaryRecord
             {
