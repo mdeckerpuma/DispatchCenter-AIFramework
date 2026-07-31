@@ -142,8 +142,11 @@ PRIORITY INFERENCE GUIDE:
             [Description("Location of the incident")] string location,
             [Description("Short description of what is happening")] string description)
         {
-            if (!Enum.TryParse<IncidentType>(type, out IncidentType itype)) return $"Invalid type: {type}";
-            if (!Enum.TryParse<IncidentPriority>(priority, out IncidentPriority ipriority)) return $"Invalid type: {priority}";
+            // ignoreCase: true on both. The model hands these over as free text and is only
+            // usually careful about capitalization — "fire" instead of "Fire" would otherwise
+            // bounce the whole report back as an error string mid-conversation.
+            if (!Enum.TryParse<IncidentType>(type, true, out IncidentType itype)) return $"Invalid type: {type}";
+            if (!Enum.TryParse<IncidentPriority>(priority, true, out IncidentPriority ipriority)) return $"Invalid priority: {priority}";
 
             Incident i = _service.ReportIncident(itype, ipriority, location, description);
 
