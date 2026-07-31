@@ -286,7 +286,6 @@ PRIORITY INFERENCE GUIDE:
             if (increc.Count == 0) { Console.WriteLine("No Active Incidents from previous session."); }
             else
             {
-                int highest = 0;
                 foreach (IncidentRecord i in increc)
                 {
                     if (!Enum.TryParse<IncidentType>(i.Type, out IncidentType type)) { continue; }
@@ -330,13 +329,23 @@ PRIORITY INFERENCE GUIDE:
                         temp.MarkOnScene();
                     }
 
-                    int num = int.Parse(i.IncidentId.Split("-")[1]);
-                    if(num > highest)
-                    {
-                        highest = num;
-                    }
                 }
-                _service.SetNextId(highest + 1);            
+            }
+
+            // The id counter has to be rebuilt from EVERY incident ever recorded, which is
+            // why this sits outside the else and asks the repository rather than counting
+            // the active set. Resolved documents are invisible to GetActiveIncidentAsync,
+            // so resolving the whole board left the counter at its 1000 default and the next
+            // incident re-minted an id that already existed in Mongo. Nothing enforces
+            // uniqueness on IncidentId, so that inserted a duplicate, and UpdateOneAsync
+            // then wrote to whichever document matched first — usually the old resolved one,
+            // which resurrected it as a ghost incident on the following boot.
+            // Left alone when the collection is empty so a fresh database still starts at
+            // INC-1000 instead of INC-1.
+            int highest = await _repository.GetHighestIncidentNumberAsync();
+            if (highest > 0)
+            {
+                _service.SetNextId(highest + 1);
             }
 
             string context = await _summaryagent.SummarizeAsync();
