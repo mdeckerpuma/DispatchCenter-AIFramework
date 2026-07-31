@@ -282,13 +282,37 @@ PRIORITY INFERENCE GUIDE:
 
                     foreach (AssignedUnitRecord u in i.AssignedUnits)
                     {
+                        // An assignment has TWO sides: the unit points at the incident, and the
+                        // incident lists the unit. Both have to come back or the restore is a lie.
+                        // AssignedUnitIds is the only path from an incident back to its units, and
+                        // ResolveIncident walks it to free them — leave it empty and a carried-over
+                        // incident resolves without releasing anything, in memory or in Mongo.
+                        // Done before the roster lookup on purpose: even if a unit is no longer in
+                        // the fleet, keeping its id here is what lets ResolveIncident reset its row.
+                        temp.AssignUnit(u.UnitId);
+
                         Unit? unit = _service.GetUnits().FirstOrDefault(unit => unit.Id == u.UnitId);
                         if (unit == null) continue;
 
+                        // Dispatch() is what sets AssignIncidentId, so an OnScene unit has to be
+                        // walked through Dispatch first. ArriveOnScene() on its own leaves the unit
+                        // on scene at nothing — it printed "arrived on scene at " with a blank id.
                         if (u.UnitStatus == UnitStatus.Dispatched.ToString())
+                        {
                             unit.Dispatch(i.IncidentId);
+                        }
                         else if (u.UnitStatus == UnitStatus.OnScene.ToString())
+                        {
+                            unit.Dispatch(i.IncidentId);
                             unit.ArriveOnScene();
+                        }
+                    }
+
+                    // AssignUnit only ever lifts Pending -> Responding, so an incident that was
+                    // already OnScene has to say so explicitly or it comes back reporting Pending.
+                    if (i.Status == IncidentStatus.OnScene.ToString())
+                    {
+                        temp.MarkOnScene();
                     }
 
                     int num = int.Parse(i.IncidentId.Split("-")[1]);

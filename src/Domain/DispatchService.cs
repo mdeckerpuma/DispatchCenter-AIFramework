@@ -127,6 +127,11 @@ public class DispatchService
 
     public void LoadIncident(Incident i)
     {
+        // Same StatusChanged wiring ReportIncident does. Without it a carried-over
+        // incident is silent for the rest of the shift — resolving it printed nothing
+        // while a live incident printed "[Incident] Resolved".
+        i.StatusChanged += (_, msg) => Console.WriteLine($"[Incident] {msg}");
+
         _incidents.Add(i);
     }
 
