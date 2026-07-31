@@ -42,6 +42,14 @@ public class DispatchService
         if(foundUnit == null) { return false; }
         if(foundIncident == null) { return false; }
 
+        // The guards the caller's error message always claimed but the code never
+        // enforced. Without them a Dispatched unit could be sent somewhere else,
+        // silently overwriting AssignIncidentId and orphaning it from the incident
+        // it was already committed to, and a Resolved incident would happily take
+        // on new units.
+        if(foundUnit.Status != UnitStatus.Available) { return false; }
+        if(foundIncident.Status == IncidentStatus.Resolved) { return false; }
+
         foundUnit.Dispatch(foundIncident.Id);
         foundIncident.AssignUnit(foundUnit.Id);
 
@@ -108,18 +116,72 @@ public class DispatchService
         return unresolved;
     }
 
+    // This is the agent's only window onto real state, and the system prompt forbids
+    // dispatching or resolving without calling it first. It used to print every incident
+    // as "IS ACTIVE" and drop both Status and AssignedUnitIds, so the model could not
+    // tell Pending from OnScene and had to guess which units were committed where.
     public string GetStatus()
     {
         StringBuilder sb = new StringBuilder();
+
         sb.AppendLine("ACTIVE INCIDENTS");
-        foreach(Incident active in GetActiveIncidents())
+        List<Incident> active = GetActiveIncidents();
+        if(active.Count == 0)
         {
-            sb.AppendLine($"{active.Id} in {active.Location} IS ACTIVE");
+            sb.AppendLine("none");
         }
-        sb.AppendLine("\nUNITS");
+        foreach(Incident incident in active)
+        {
+            string assigned;
+            if(incident.AssignedUnitIds.Count == 0)
+            {
+                assigned = "none";
+            }
+            else
+            {
+                assigned = string.Join(", ", incident.AssignedUnitIds);
+            }
+
+            sb.AppendLine($"{incident.Id} | {incident.Type} | {incident.Priority} | {incident.Status} | {incident.Location} | Units: {assigned}");
+        }
+
+        // Committed units go one per line so the model can see exactly what is tied up
+        // and where. Available ones are grouped by type to keep a 50-unit roster from
+        // flooding the context on every single call.
+        sb.AppendLine("\nUNITS ON ASSIGNMENT");
+        int committed = 0;
         foreach(Unit unit in GetUnits())
         {
-            sb.AppendLine($"{unit.Type} [{unit.Id}] status is {unit.Status}");
+            if(unit.Status == UnitStatus.Available) { continue; }
+
+            sb.AppendLine($"{unit.Id} | {unit.Name} | {unit.Type} | {unit.Status} | on {unit.AssignIncidentId}");
+            committed++;
+        }
+        if(committed == 0)
+        {
+            sb.AppendLine("none");
+        }
+
+        sb.AppendLine("\nAVAILABLE UNITS");
+        foreach(UnitType type in Enum.GetValues<UnitType>())
+        {
+            List<string> ids = new List<string>();
+            foreach(Unit unit in GetUnits())
+            {
+                if(unit.Type == type && unit.Status == UnitStatus.Available)
+                {
+                    ids.Add(unit.Id);
+                }
+            }
+
+            if(ids.Count == 0)
+            {
+                sb.AppendLine($"{type}: none");
+            }
+            else
+            {
+                sb.AppendLine($"{type}: {string.Join(", ", ids)}");
+            }
         }
 
         return sb.ToString();

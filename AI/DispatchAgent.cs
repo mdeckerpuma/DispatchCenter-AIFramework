@@ -172,7 +172,19 @@ PRIORITY INFERENCE GUIDE:
             [Description("Get the correct incident id based on the id, location, or description of the incident")] string incidentId)
         {           
             bool i = _service.DispatchUnit(unitId, incidentId);
-            if (!i) return $"Either the unit is already active or incident doesn't exist / resolved";
+            if (!i)
+            {
+                // Say WHICH guard tripped. The old catch-all listed every possible cause at
+                // once, so the model could only guess and usually retried the same bad call.
+                Unit? bad = _service.GetUnits().FirstOrDefault(unit => unit.Id == unitId);
+                if (bad == null) return $"No unit with id {unitId}. Call GetStatus for valid unit ids.";
+                if (bad.Status != UnitStatus.Available) return $"{unitId} is not available - it is {bad.Status} on {bad.AssignIncidentId}. Choose a different unit.";
+
+                Incident? target = _service.GetActiveIncidents().FirstOrDefault(incident => incident.Id == incidentId);
+                if (target == null) return $"No active incident with id {incidentId}. Call GetStatus for valid incident ids.";
+
+                return $"Could not dispatch {unitId} to {incidentId}.";
+            }
 
             Unit unit = _service.GetUnits().FirstOrDefault(unit => unit.Id == unitId)!;
 
