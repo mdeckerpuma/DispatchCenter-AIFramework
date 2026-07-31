@@ -1,5 +1,9 @@
 ﻿using System;
 
+// State machine, not a DTO. Status and AssignIncidentId are private-set, so the only way to
+// move a unit is through a transition method that also raises StatusChanged. That is what
+// makes the console commentary a side effect of real state changes rather than something
+// callers remember to print.
 public class Unit
 {
     public string Id { get; }

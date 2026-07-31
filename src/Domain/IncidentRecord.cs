@@ -6,6 +6,9 @@ using MongoDB.Bson.Serialization.Attributes;
 
 namespace Domain
 {
+    // Persistence shape, kept separate from the Incident domain object. Bson attributes and
+    // stringly-typed enums live here so the domain object stays free of storage concerns and
+    // a schema change does not ripple into the state machine.
     public class IncidentRecord
     {
         [BsonId]

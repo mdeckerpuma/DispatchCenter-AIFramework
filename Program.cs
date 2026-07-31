@@ -6,10 +6,16 @@ using OpenTelemetry;
 using OpenTelemetry.Trace;
 using Azure.Monitor.OpenTelemetry.Exporter;
 
+// Composition root. Deliberately dull: build telemetry, read config, create the one
+// IChatClient both agents share, wire the domain, seed the roster, hand off to the agent.
+// Changing model or provider is a change to ChatClientFactory alone — nothing below it
+// knows which LLM is behind the IChatClient.
 internal class Program
 {
     static async Task Main(string[] args)
     {
+        // Tracing is set up before anything else so the IChatClient built below, which is
+        // wrapped in UseOpenTelemetry, has a live provider to emit spans into.
         using var tracerProvider = Sdk.CreateTracerProviderBuilder()
            .AddSource("DispatchDemo")
            .AddAzureMonitorTraceExporter()
@@ -26,6 +32,9 @@ internal class Program
         string agentDeployment = config["AzureOpenAI:AgentDeployment"]!;
         IChatClient chatClient = ChatClientFactory.Create(config, agentDeployment);
 
+        // One chat client, two agents. Both therefore run on the same deployment and the
+        // same telemetry pipeline, and the domain below is constructed the same way the
+        // menu-driven BaseVersion constructs it.
         ConsoleDispatchSink sink = new ConsoleDispatchSink();
         DispatchService main = new DispatchService(sink);
         IncidentRepository repo = new IncidentRepository(connectionString, dbName);
@@ -33,6 +42,9 @@ internal class Program
         SummaryAgent sum = new SummaryAgent(repo,summaryrepo,chatClient);
 
 
+        // Fixed roster, in memory, recreated identically every run. Units are never
+        // persisted — only incidents and their assignments are — so a restart rebuilds the
+        // fleet and then replays statuses onto it from Mongo in DispatchAgent.RunAsync.
         Unit police1 = new Unit("POL001", "Eagle One", UnitType.Police);
         Unit police2 = new Unit("POL002", "Iron Fist", UnitType.Police);
         Unit police3 = new Unit("POL003", "Shadow Unit", UnitType.Police);

@@ -6,6 +6,13 @@ using System.Linq;
 using System.Text;
 
 
+// In-memory source of truth for a shift. Every state change lands here first and Mongo is
+// a mirror written afterwards by the caller, never read back mid-shift.
+//
+// Knows nothing about AI on purpose. The same service backs the menu-driven BaseVersion and
+// the agent-driven app, which is what makes the two comparable: only the interaction layer
+// differs. Methods return bool rather than throwing, so a caller — a menu or a tool — can
+// turn a refusal into a message instead of an exception.
 public class DispatchService
 {
     private List<Unit> _units { get; } = new();

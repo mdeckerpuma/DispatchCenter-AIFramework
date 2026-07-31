@@ -9,6 +9,11 @@ using System.Text;
 
 namespace UsingAIFramework.AI
 {
+    // A second single-purpose agent rather than another tool hung off the dispatch agent.
+    // It gets its own instructions and one narrow job — turn raw incident records into a
+    // briefing — which keeps the dispatch agent's instructions about dispatching. Called
+    // two ways: directly at startup for the shift handoff, and as an approval-gated tool
+    // when the dispatcher asks for a briefing mid-shift.
     public class SummaryAgent
     {
         private readonly IIncidentRepository _incidents;

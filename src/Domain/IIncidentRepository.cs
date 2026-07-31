@@ -4,6 +4,8 @@ using System.Text;
 
 namespace Domain
 {
+    // The AI layer depends on this interface, never on IncidentRepository, so storage can be
+    // swapped or faked without touching the agent.
     public interface IIncidentRepository
     {
         Task SaveIncidentAsync(IncidentRecord Record);

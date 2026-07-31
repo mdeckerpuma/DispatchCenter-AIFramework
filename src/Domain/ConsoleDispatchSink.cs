@@ -3,6 +3,7 @@ using System.IO;
 
 namespace Domain
 {
+    // Development implementation of the seam: prints the order instead of sending it anywhere.
     public class ConsoleDispatchSink : IDispatchSink
     {
         public void send(DispatchOrder order)

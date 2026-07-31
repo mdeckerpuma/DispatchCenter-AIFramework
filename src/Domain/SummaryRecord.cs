@@ -6,6 +6,8 @@ using MongoDB.Bson.Serialization.Attributes;
 
 namespace Domain
 {
+    // Persistence shape for a generated briefing. One row per SummarizeAsync run, which is why
+    // that call is approval-gated when the model reaches for it.
     public class SummaryRecord
     {
         [BsonId]

@@ -5,6 +5,9 @@ using System.Text;
 
 namespace Domain
 {
+    // MongoDB mirror of what already happened in DispatchService. Updates are targeted field
+    // sets rather than whole-document replaces, so two writes for the same incident cannot
+    // clobber each other's fields.
     public class IncidentRepository : IIncidentRepository
     {
         private readonly IMongoCollection<IncidentRecord> _incidents;
