@@ -1,24 +1,7 @@
-﻿using Anthropic.Models.Beta.Messages;
-using Azure;
-using Azure.AI.OpenAI;
-using Azure.AI.Projects;
-using Azure.Identity;
-using Domain;
+﻿using Domain;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
-using Microsoft.VisualBasic;
-using OllamaSharp;
-using System;
-using System.Collections.Generic;
 using System.ComponentModel;
-using System.Linq;
-using System.Reflection;
-using System.Reflection.Metadata;
-using System.Runtime.Intrinsics.X86;
-using System.Text.Json;
-using System.Timers;
-using static Google.Protobuf.Reflection.SourceCodeInfo.Types;
-using static System.Net.Mime.MediaTypeNames;
 
 namespace UsingAIFramework.AI
 {
@@ -29,18 +12,17 @@ namespace UsingAIFramework.AI
         private readonly SummaryAgent _summaryagent;
         private readonly AIAgent _agent;
         private readonly bool _debug;
-        private readonly IChatClient _chatClient;
 
 
-        public DispatchAgent(DispatchService service, IIncidentRepository repository, SummaryAgent summaryagent, IChatClient chatClient,bool debug = false) 
+        public DispatchAgent(DispatchService service, IIncidentRepository repository, SummaryAgent summaryagent, IChatClient chatClient,bool debug = false)
         {
             _service = service;
             _repository = repository;
             _summaryagent = summaryagent;
             _debug = debug;
-            _chatClient = chatClient;
 
-            _agent = _chatClient
+            // Not held as a field: the client is only ever needed here, to build the agent.
+            _agent = chatClient
                 .AsAIAgent(new ChatClientAgentOptions
                 {
                     Name = "Dispatch Agent",
@@ -88,7 +70,7 @@ PRIORITY INFERENCE GUIDE:
                 }).AsBuilder()
                   .Use(LoggingMiddleware)
                   .Use(FunctionGateMiddleware)
-                  .Build(); ;
+                  .Build();
 
             
         }

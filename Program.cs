@@ -1,9 +1,6 @@
 ﻿using Domain;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Configuration.Json;
-using System;
-using System.Collections.Generic;
 using UsingAIFramework.AI;
 using OpenTelemetry;
 using OpenTelemetry.Trace;

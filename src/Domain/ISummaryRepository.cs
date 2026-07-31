@@ -7,6 +7,5 @@ namespace Domain
     public interface ISummaryRepository
     {
         Task SaveSummaryAsync(SummaryRecord record);
-        Task<SummaryRecord?> GetLatestSummaryAsync();
     }
 }

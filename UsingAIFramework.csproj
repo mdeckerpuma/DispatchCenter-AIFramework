@@ -21,19 +21,21 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Anthropic" Version="12.36.0" />
+    <!-- In use today: Azure OpenAI as the IChatClient provider, the Agents.AI agent layer,
+         Extensions.AI for the abstraction + middleware, Configuration(.Json) for
+         appsettings, and the Azure Monitor exporter for the OpenTelemetry traces. -->
     <PackageReference Include="Azure.AI.OpenAI" Version="2.1.0" />
-    <PackageReference Include="Azure.AI.Projects" Version="2.0.1" />
-    <PackageReference Include="Azure.Identity" Version="1.21.0" />
     <PackageReference Include="Azure.Monitor.OpenTelemetry.Exporter" Version="1.8.3" />
-    <PackageReference Include="Microsoft.Agents.AI.Foundry" Version="1.5.0" />
     <PackageReference Include="Microsoft.Agents.AI.OpenAI" Version="1.13.0" />
     <PackageReference Include="Microsoft.Extensions.AI" Version="10.8.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.10" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.10" />
-    <PackageReference Include="MongoDB.Driver" Version="3.10.0" />
+
+    <!-- Not used by the demo yet. Kept on purpose: labs/README.md commits these two as
+         Lab 1's point, that Ollama and Claude implement the same IChatClient the Azure
+         provider does. Move them to the lab project once it exists. -->
+    <PackageReference Include="Anthropic" Version="12.36.0" />
     <PackageReference Include="OllamaSharp" Version="5.4.27" />
-    <PackageReference Include="OpenTelemetry.Exporter.Console" Version="1.17.0" />
   </ItemGroup>
 
 </Project>

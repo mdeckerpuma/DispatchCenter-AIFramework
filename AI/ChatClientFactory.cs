@@ -23,7 +23,7 @@ namespace UsingAIFramework.AI
                 .AsIChatClient()
                 .AsBuilder()
                 .UseOpenTelemetry(sourceName: "DispatchDemo", configure: cfg => cfg.EnableSensitiveData = true)
-                .Build(); ;
+                .Build();
         }
     }
 }

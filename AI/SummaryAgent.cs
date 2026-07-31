@@ -14,23 +14,20 @@ namespace UsingAIFramework.AI
         private readonly IIncidentRepository _incidents;
         private readonly ISummaryRepository _summaries;
         private readonly AIAgent _agent;
-        private readonly IChatClient _chatClient;
 
-        public SummaryAgent(IIncidentRepository incidents, ISummaryRepository summaries, IChatClient chatClient) 
+        public SummaryAgent(IIncidentRepository incidents, ISummaryRepository summaries, IChatClient chatClient)
         {
-            _incidents = incidents; 
+            _incidents = incidents;
             _summaries = summaries;
-            _chatClient = chatClient;
 
-            _agent = _chatClient
+            // Not held as a field: the client is only ever needed here, to build the agent.
+            _agent = chatClient
                 .AsAIAgent(new ChatClientAgentOptions
                 {
                     Name = "Summary Agent",
                     ChatOptions = new()
                     {
-                        Instructions = "You are a shift handoff assistant. Given raw incident data, produce a compact briefing a dispatcher can read in 30 seconds. Cover status, priority, and which units are committed. Each record is guaranteed to have IncidentId, Type, Priority, Status, and Location. AssignedUnits may be empty if no units have been dispatched yet. Do not invent or assume any information not present in the data. Be concise — one or two sentences per incident maximum.\r\n",
-                        Tools =
-                        []
+                        Instructions = "You are a shift handoff assistant. Given raw incident data, produce a compact briefing a dispatcher can read in 30 seconds. Cover status, priority, and which units are committed. Each record is guaranteed to have IncidentId, Type, Priority, Status, and Location. AssignedUnits may be empty if no units have been dispatched yet. Do not invent or assume any information not present in the data. Be concise — one or two sentences per incident maximum.\r\n"
                     }
                 });
         }

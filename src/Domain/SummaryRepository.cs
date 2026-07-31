@@ -20,12 +20,5 @@ namespace Domain
         {
             await _summaries.InsertOneAsync(record);
         }
-
-        public async Task<SummaryRecord> GetLatestSummaryAsync()
-        {
-            var filter = Builders<SummaryRecord>.Filter.Empty;
-            return await _summaries.Find(filter).SortByDescending(r => r.CreatedAt).FirstOrDefaultAsync();
-
-        }
     }
 }
