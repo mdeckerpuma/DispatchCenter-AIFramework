@@ -21,8 +21,60 @@ internal class Program
            .AddAzureMonitorTraceExporter()
            .Build();
 
-        IConfiguration config = new ConfigurationBuilder()
-            .AddJsonFile("appsettings.json")
+        // Key-based Azure OpenAI auth (DefaultAzureCredential fails in our environment).
+        // Set AZURE_OPENAI_API_KEY in your environment before running.
+        string apiKey = Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY")
+            ?? throw new InvalidOperationException("Set AZURE_OPENAI_API_KEY before running.");
+
+        // #2/#3  Build each provider as the SAME interface (IChatClient), then wrap them
+        //        so the active one can be swapped at runtime. The agent is built ONCE over
+        //        the wrapper; swapping the model keeps the conversation memory because
+        //        history lives in the session, not the model.
+        IChatClient azure = new AzureOpenAIClient(
+                new Uri("https://squidopenai.openai.azure.com/"),
+                new AzureKeyCredential(apiKey))
+            .GetChatClient("gpt-4o-mini")
+            .AsIChatClient();
+
+        IChatClient ollama = new OllamaApiClient(new Uri("http://localhost:11434"), "llama3.2");
+
+        clientSwitch = new SwitchableChatClient("azure", azure);
+        clientSwitch.Register("ollama", ollama);
+
+        // Claude — ready for fold-in. Set ANTHROPIC_API_KEY, then uncomment these lines:
+        // string? claudeKey = Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY");
+        // if (!string.IsNullOrEmpty(claudeKey))
+        //     clientSwitch.Register("claude",
+        //         new Anthropic.AnthropicClient(claudeKey).AsIChatClient("claude-sonnet-4-5"));
+
+        AIAgent agent = clientSwitch
+            .AsAIAgent(new ChatClientAgentOptions
+            {
+                Name = "DispatchAgent",
+                // #4  Context storage/retrieval: this provider injects the live dispatch
+                //     state into the model before EVERY turn, so the agent can answer
+                //     "what is POL111 doing?" from retrieved context without a tool call.
+                AIContextProviders = new List<AIContextProvider> { new DispatchContextProvider(BuildStateSnapshot) },
+                ChatOptions = new()
+                {
+                    Instructions = "You are a city dispatch center assistant. Use GetStatus first to find current unit and incident IDs before dispatching or resolving. Always use exact IDs. After you report an incident you MAY offer to dispatch an appropriate available unit (report then dispatch is the ONE allowed chain); do not chain any other actions. For everything else, do only the single action the user explicitly asks for. If you just proposed a tool call and the user declined it, do not re-propose that same call again in that same turn; acknowledge and wait. But if the user later explicitly asks for that action again in a new message, go ahead and propose it.",
+                    Tools =
+                    [
+                        AIFunctionFactory.Create(GetStatus),
+                        AIFunctionFactory.Create(switch_model),
+                        // Recall is exposed so the AI CAN attempt it, but the gate hard-blocks
+                        // every AI attempt — recall is human-only via /authorize recall.
+                        AIFunctionFactory.Create(RecallAllUnitsFromIncident),
+                        new ApprovalRequiredAIFunction(AIFunctionFactory.Create(ReportIncident)),
+                        new ApprovalRequiredAIFunction(AIFunctionFactory.Create(DispatchUnit)),
+                        new ApprovalRequiredAIFunction(AIFunctionFactory.Create(MarkArrived)),
+                        new ApprovalRequiredAIFunction(AIFunctionFactory.Create(ResolveIncident)),
+                    ]
+                }
+            })
+            .AsBuilder()
+            .Use(LoggingMiddleware)      // #5 run middleware: prints debug info each turn
+            .Use(FunctionGateMiddleware) // #6 function-calling middleware: allow-list + arg validation
             .Build();
 
         bool debug = args.Contains("--verbose");
