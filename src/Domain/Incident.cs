@@ -1,6 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 
+// State machine, same shape as Unit. AssignUnit is the only path that lifts Pending ->
+// Responding, so anything rebuilding an incident from storage has to go through the
+// transitions rather than assigning fields, or it comes back with a status that does not
+// match its own assignments.
 public class Incident
 {
     public string Id { get; }

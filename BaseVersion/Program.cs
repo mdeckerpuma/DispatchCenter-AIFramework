@@ -7,29 +7,32 @@
 // SAME DispatchCenter domain is driven by natural language through an AIAgent
 // with function tools and approval gates.
 //
-// The domain code (DispatchCenter.cs, Unit.cs, Incident.cs, enums.cs) is
+// The domain code (DispatchService.cs, Unit.cs, Incident.cs, enums.cs) is
 // IDENTICAL between the two versions — only the interaction layer changes.
 // That is the point of the comparison.
 //
-// This is a standalone project (BaseVersion.csproj) linking the shared domain
-// files; the root project excludes this folder so the two Mains never collide.
+// This is a standalone project (BaseVersion.csproj) with a ProjectReference to
+// src/Domain; the root project excludes this folder so the two Mains never
+// collide.
+//
+// NO PERSISTENCE. This version never touches MongoDB — every unit and incident
+// lives in memory for the life of the run and is gone when you quit. Only the
+// AI version mirrors state to Mongo through the repositories.
 // ═══════════════════════════════════════════════════════════════════════════
+
+using Domain;
 
 internal class Program
 
     {
-
-    static DispatchCenter main = new DispatchCenter();
+    static ConsoleDispatchSink sink = new ConsoleDispatchSink();
+    static DispatchService main = new DispatchService(sink);
 
     static void Main(string[] args)
 
         {
 
-        main.IncidentReported += (_, e) => Console.WriteLine($"\n[INCIDENT] {e.Incident.Id} at {e.Incident.Location}");
-
-        main.UnitDispatched += (_, e) => Console.WriteLine($"\n[DISPATCH] {e.Unit.Id} dispatched to {e.Incident.Location}");
-
-        main.AlertBroadcast += (_, msg) => Console.WriteLine($"\n[ALERT] {msg}");
+        
 
         Unit police1 = new Unit("POL111", "Ride Combat", UnitType.Police);
 
@@ -238,7 +241,7 @@ internal class Program
 
         string incidentId = Console.ReadLine();
 
-        bool disbatch = main.DisbatchUnit(unitId, incidentId);
+        bool disbatch = main.DispatchUnit(unitId, incidentId);
 
         if (disbatch)
 
